@@ -13,45 +13,57 @@ import (
 func main() {
 	// Define a command line flag called 'sec' to capture an integer value
 	var seconds int
-	flag.IntVar(&seconds, "sec", 60, "An integer representing seconds")
+	flag.IntVar(&seconds, "sec", 300, "An integer representing seconds")
 
 	// Define a custom help flag
 	showHelp := flag.Bool("help", false, "Show help message")
-
-	// Parse the command line flags
 	flag.Parse()
 
 	// Check if the help flag was provided, and if so, display the help message
 	if *showHelp {
 		fmt.Println("Usage of the program:")
 		fmt.Println("  -sec int")
-		fmt.Println("        An integer representing seconds. Default: 60")
+		fmt.Println("        An integer representing seconds. Default: 300")
 		fmt.Println("  -help")
 		fmt.Println("        Show help message")
-
-		// Exit the program after displaying the help message
 		os.Exit(0)
 	}
 
-	// Run our move function
-	move(seconds)
+	timer(seconds)
 }
 
-func move(seconds int) {
-	robotgo.MouseSleep = 100
+func timer(seconds int) {
+	ticker := time.NewTicker(time.Duration(seconds) * time.Second)
+	var quit = make(chan bool)
 
-	for {
-		// Get start location
-		start_x, start_y := robotgo.Location()
+	x, y := robotgo.Location()
 
-		time.Sleep(time.Duration(seconds) * time.Second)
-
-		// Get our current location
-		current_x, current_y := robotgo.Location()
-
-		// If the start and current locations are the same, move the mouse
-		if start_x == current_x && start_y == current_y {
-			robotgo.Move(rand.Intn(1000), rand.Intn(1000))
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				x, y = move(x, y)
+			case <-quit:
+				ticker.Stop()
+				return
+			}
 		}
+	}()
+
+	// Wait for the quit channel
+	<-quit
+}
+
+// Moves the mouse to a random location on the screen if the mouse hasn't moved since the last call
+func move(prevX int, prevY int) (int, int) {
+	currentX, currentY := robotgo.Location()
+
+	if currentX == prevX && currentY == prevY {
+		screenX, screenY := robotgo.GetScreenSize()
+		randX, randY := rand.Intn(screenX), rand.Intn(screenY)
+		robotgo.Move(randX, randY)
+		return randX, randY
 	}
+
+	return currentX, currentY
 }
